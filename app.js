@@ -226,6 +226,70 @@
   });
 })();
 
+/* ── DASHBOARD MOCKUP CHART ── */
+(function () {
+  const canvas = document.getElementById('dashChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  let points = Array.from({ length: 30 }, () => 0.4 + Math.random() * 0.45);
+
+  function draw() {
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    canvas.width  = W * window.devicePixelRatio;
+    canvas.height = H * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.clearRect(0, 0, W, H);
+
+    if (W === 0 || H === 0) return;
+
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, 'rgba(101,118,255,0.3)');
+    grad.addColorStop(1, 'rgba(101,118,255,0)');
+
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    points.forEach((p, i) => {
+      ctx.lineTo((i / (points.length - 1)) * W, H - p * H * 0.85);
+    });
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    points.forEach((p, i) => {
+      const x = (i / (points.length - 1)) * W;
+      const y = H - p * H * 0.85;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#6576ff';
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    const last = points[points.length - 1];
+    const lx = W - 2, ly = H - last * H * 0.85;
+    ctx.beginPath();
+    ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#6576ff';
+    ctx.fill();
+  }
+
+  function update() {
+    points.shift();
+    const last = points[points.length - 1];
+    points.push(Math.max(0.1, Math.min(0.95, last + (Math.random() - 0.5) * 0.1)));
+    draw();
+  }
+
+  const ro = new ResizeObserver(draw);
+  ro.observe(canvas);
+  draw();
+  setInterval(update, 800);
+})();
+
 /* ── SMOOTH PARALLAX HERO ── */
 (function () {
   const hero = document.querySelector('.hero');
