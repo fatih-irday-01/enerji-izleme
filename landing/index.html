@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enerji İzleme — Endüstriyel Enerji Yönetim Platformu</title>
+  <meta name="description" content="Tüm tesislerinizin enerji tüketimini gerçek zamanlı izleyin. Uçtan uca şifreli iletim, çevrimdışı veri güvencesi ve akıllı fatura hesaplama." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+  /* ═══════════════════════════════════════════════
+     TOKENS
+  ═══════════════════════════════════════════════ */
+  :root {
+    --bg:       #07080D;
+    --bg2:      #0B0C14;
+    --card:     #10111A;
+    --card2:    #14151F;
+    --border:   #1C1E2C;
+    --border2:  #242638;
+
+    --y:        #E8FF45;   /* electric yellow — primary  */
+    --y2:       #C8E030;   /* darker yellow              */
+    --o:        #FF6030;   /* volcanic orange — secondary */
+    --o2:       #E84E20;
+    --g:        #2EFFA0;   /* online / status green      */
+
+    --text:     #ECEAF6;
+    --muted:    #5A5870;
+    --dim:      #383648;
+
+    --mono:     'JetBrains Mono', monospace;
+  }
+
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    overflow-x:hidden;
+    line-height:1.6;
+  }
+
+  /* ─── canvas bg ─── */
+  #bgCanvas{
+    position:fixed;inset:0;z-index:0;
+    opacity:.45;pointer-events:none;
+  }
+  .noise{
+    position:fixed;inset:0;z-index:1;pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    opacity:.5;
+  }
+  nav,section,footer,header{position:relative;z-index:2}
+
+  /* ═══════════════════════════════════════════════
+     TYPOGRAPHY
+  ═══════════════════════════════════════════════ */
+  .mono{font-family:var(--mono);letter-spacing:-.02em}
+
+  /* ═══════════════════════════════════════════════
+     LAYOUT
+  ═══════════════════════════════════════════════ */
+  .container{max-width:1160px;margin:0 auto;padding:0 24px}
+
+  .section-tag{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.12em;text-transform:uppercase;
+    color:var(--y);padding:5px 12px;border-radius:4px;
+    background:rgba(232,255,69,.07);border:1px solid rgba(232,255,69,.2);
+    margin-bottom:20px;
+  }
+  .section-tag::before{
+    content:'';width:6px;height:6px;border-radius:50%;
+    background:var(--y);box-shadow:0 0 8px var(--y);
+    animation:blink 2s ease-in-out infinite;
+  }
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+  h2.section-title{
+    font-size:clamp(30px,4.5vw,52px);font-weight:900;
+    letter-spacing:-.03em;line-height:1.1;margin-bottom:16px;
+  }
+  h2.section-title em{
+    font-style:normal;
+    background:linear-gradient(125deg,var(--y) 0%,var(--o) 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .section-sub{
+    font-size:17px;color:var(--muted);max-width:580px;
+    line-height:1.7;margin-bottom:64px;
+  }
+
+  /* ═══════════════════════════════════════════════
+     NAV
+  ═══════════════════════════════════════════════ */
+  .nav{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    background:rgba(7,8,13,.8);backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--border);
+  }
+  .nav-inner{
+    max-width:1160px;margin:0 auto;padding:0 24px;
+    height:62px;display:flex;align-items:center;justify-content:space-between;
+  }
+  .logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+  .logo-icon{
+    width:34px;height:34px;border-radius:8px;
+    background:var(--y);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 20px rgba(232,255,69,.4);
+  }
+  .logo-icon svg{width:18px;height:18px;color:var(--bg)}
+  .logo-text{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.02em}
+  .logo-text span{color:var(--y)}
+
+  .nav-links{display:flex;align-items:center;gap:28px}
+  .nav-links a{
+    font-size:13px;font-weight:500;color:var(--muted);
+    text-decoration:none;transition:color .2s;
+  }
+  .nav-links a:hover{color:var(--text)}
+
+  .btn-login{
+    display:inline-flex;align-items:center;gap:7px;
+    background:var(--y);color:var(--bg);
+    font-weight:700;font-size:13px;
+    padding:8px 18px;border-radius:7px;
+    text-decoration:none;border:none;cursor:pointer;
+    transition:background .2s,box-shadow .2s,transform .15s;
+    box-shadow:0 0 0 rgba(232,255,69,0);
+  }
+  .btn-login:hover{
+    background:#F5FF70;
+    box-shadow:0 4px 24px rgba(232,255,69,.4);
+    transform:translateY(-1px);
+  }
+  .btn-login svg{width:14px;height:14px}
+
+  /* ═══════════════════════════════════════════════
+     HERO
+  ═══════════════════════════════════════════════ */
+  .hero{
+    min-height:100vh;padding:120px 24px 0;
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;
+    position:relative;overflow:hidden;
+  }
+
+  /* rotating gradient orbs */
+  .orb{
+    position:absolute;border-radius:50%;
+    filter:blur(120px);pointer-events:none;
+  }
+  .orb-1{
+    width:600px;height:600px;
+    background:radial-gradient(circle,rgba(232,255,69,.12) 0%,transparent 65%);
+    top:-10%;left:50%;transform:translateX(-50%);
+    animation:drift1 12s ease-in-out infinite;
+  }
+  .orb-2{
+    width:400px;height:400px;
+    background:radial-gradient(circle,rgba(255,96,48,.1) 0%,transparent 65%);
+    bottom:5%;right:-5%;
+    animation:drift2 15s ease-in-out infinite;
+  }
+  @keyframes drift1{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-45%) scale(1.1)}}
+  @keyframes drift2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,-20px)}}
+
+  .hero-inner{position:relative;z-index:1;max-width:900px}
+
+  .hero-eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--y);
+    margin-bottom:28px;padding:6px 14px;border-radius:100px;
+    background:rgba(232,255,69,.06);border:1px solid rgba(232,255,69,.2);
+  }
+  .hero-dot{
+    width:7px;height:7px;border-radius:50%;background:var(--y);
+    box-shadow:0 0 10px var(--y);animation:blink 1.5s ease-in-out infinite;
+  }
+
+  .hero h1{
+    font-size:clamp(44px,8vw,92px);font-weight:900;
+    letter-spacing:-.04em;line-height:1.0;margin-bottom:28px;
+  }
+  .hero h1 .word-1{display:block;color:var(--text)}
+  .hero h1 .word-2{
+    display:block;
+    background:linear-gradient(125deg,var(--y) 0%,var(--o) 60%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .hero h1 .word-3{display:block;color:var(--text);opacity:.7}
+
+  .hero-desc{
+    font-size:clamp(15px,1.8vw,19px);color:var(--muted);
+    max-width:620px;margin:0 auto 40px;line-height:1.75;
+  }
+
+  .hero-actions{
+    display:flex;align-items:center;justify-content:center;
+    gap:14px;flex-wrap:wrap;margin-bottom:72px;
+  }
+  .btn-hero{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--y);color:var(--bg);
+    font-weight:800;font-size:15px;
+    padding:14px 32px;border-radius:10px;
+    text-decoration:none;border:none;cursor:pointer;
+    transition:all .2s;letter-spacing:-.01em;
+    box-shadow:0 0 40px rgba(232,255,69,.25);
+  }
+  .btn-hero:hover{background:#F5FF70;box-shadow:0 8px 48px rgba(232,255,69,.4);transform:translateY(-3px)}
+  .btn-hero svg{width:16px;height:16px}
+
+  .btn-outline{
+    display:inline-flex;align-items:center;gap:8px;
+    background:transparent;color:var(--muted);
+    font-weight:600;font-size:15px;
+    padding:14px 28px;border-radius:10px;
+    text-decoration:none;border:1px solid var(--border2);cursor:pointer;
+    transition:all .2s;
+  }
+  .btn-outline:hover{color:var(--text);border-color:var(--dim)}
+
+  /* ─── ticker ─── */
+  .ticker-wrap{
+    position:relative;z-index:1;
+    display:flex;align-items:center;gap:0;
+    background:var(--card);border:1px solid var(--border);
+    border-radius:12px;padding:0 20px;overflow:hidden;
+    max-width:min(760px,100%);margin:0 auto;
+    height:44px;
+  }
+  .ticker-live{
+    display:flex;align-items:center;gap:8px;flex-shrink:0;
+    padding-right:20px;border-right:1px solid var(--border);
+    margin-right:20px;
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    color:var(--g);letter-spacing:.1em;text-transform:uppercase;
+  }
+  .ticker-live::before{
+    content:'';width:6px;height:6px;border-radius:50%;
+    background:var(--g);box-shadow:0 0 8px var(--g);
+    animation:blink 1.2s ease-in-out infinite;
+  }
+  .ticker-scroll{flex:1;overflow:hidden;position:relative}
+  .ticker-items{
+    display:flex;gap:48px;
+    animation:ticker-move 18s linear infinite;
+    white-space:nowrap;
+  }
+  .ticker-item{
+    font-family:var(--mono);font-size:12px;color:var(--muted);
+    display:flex;align-items:center;gap:10px;
+  }
+  .ticker-val{color:var(--y);font-weight:600}
+  .ticker-unit{color:var(--dim)}
+  @keyframes ticker-move{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+  /* ═══════════════════════════════════════════════
+     STATS
+  ═══════════════════════════════════════════════ */
+  .stats{
+    padding:80px 24px;
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    background:var(--bg2);
+  }
+  .stats-grid{
+    max-width:1160px;margin:0 auto;
+    display:grid;grid-template-columns:repeat(4,1fr);
+    gap:0;
+  }
+  .stat{
+    text-align:center;padding:32px 20px;
+    border-right:1px solid var(--border);
+  }
+  .stat:last-child{border-right:none}
+  .stat-num{
+    font-size:clamp(38px,5vw,60px);font-weight:900;
+    letter-spacing:-.04em;line-height:1;
+    background:linear-gradient(125deg,var(--y),var(--o));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    margin-bottom:8px;
+  }
+  .stat-label{font-size:13px;color:var(--muted);font-weight:500}
+
+  /* ═══════════════════════════════════════════════
+     FLOW — Uçtan Uca Veri Akışı
+  ═══════════════════════════════════════════════ */
+  .flow{padding:120px 0;background:var(--bg)}
+
+  .flow-diagram{
+    display:flex;align-items:flex-start;justify-content:center;
+    gap:0;overflow-x:auto;padding:0 24px 24px;
+    position:relative;
+  }
+
+  .flow-node{
+    display:flex;flex-direction:column;align-items:center;
+    text-align:center;flex-shrink:0;width:140px;
+    position:relative;
+  }
+  .fn-icon{
+    width:72px;height:72px;border-radius:16px;
+    border:1px solid var(--border2);
+    background:var(--card2);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;z-index:1;
+    transition:border-color .3s,box-shadow .3s;
+  }
+  .fn-icon svg{width:32px;height:32px;color:var(--y)}
+  .flow-node:hover .fn-icon{
+    border-color:rgba(232,255,69,.4);
+    box-shadow:0 0 30px rgba(232,255,69,.15);
+  }
+  .fn-title{font-size:13px;font-weight:700;margin:12px 0 4px;color:var(--text)}
+  .fn-desc{font-size:11px;color:var(--muted);line-height:1.4}
+
+  /* badge on node */
+  .fn-badge{
+    position:absolute;top:-8px;right:-8px;
+    background:var(--y);color:var(--bg);
+    font-family:var(--mono);font-size:9px;font-weight:700;
+    padding:2px 7px;border-radius:4px;letter-spacing:.06em;
+    box-shadow:0 0 12px rgba(232,255,69,.5);
+    z-index:2;white-space:nowrap;
+  }
+  .fn-badge.orange{background:var(--o);color:#fff;box-shadow:0 0 12px rgba(255,96,48,.4)}
+  .fn-badge.green{background:var(--g);color:var(--bg);box-shadow:0 0 12px rgba(46,255,160,.4)}
+
+  /* connector between nodes */
+  .flow-conn{
+    flex:1;min-width:40px;max-width:80px;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding-top:22px;position:relative;
+  }
+  .conn-line{
+    width:100%;height:2px;
+    background:linear-gradient(90deg,var(--border2),var(--border2));
+    position:relative;overflow:hidden;
+  }
+  .conn-line::after{
+    content:'';position:absolute;top:0;left:-100%;
+    width:40%;height:100%;
+    background:linear-gradient(90deg,transparent,var(--y),transparent);
+    animation:packet-flow 2s linear infinite;
+  }
+  @keyframes packet-flow{to{left:200%}}
+
+  .conn-label{
+    font-family:var(--mono);font-size:9px;color:var(--dim);
+    margin-top:8px;letter-spacing:.08em;text-align:center;white-space:nowrap;
+  }
+
+  /* offline bubble */
+  .flow-offline{
+    position:absolute;
+    bottom:-80px;
+    left:50%;transform:translateX(-50%);
+    background:var(--card2);border:1px solid rgba(232,255,69,.25);
+    border-radius:10px;padding:10px 14px;
+    width:220px;
+    font-size:11px;color:var(--muted);line-height:1.5;
+  }
+  .flow-offline::before{
+    content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    width:10px;height:10px;background:var(--card2);
+    border-left:1px solid rgba(232,255,69,.25);
+    border-top:1px solid rgba(232,255,69,.25);
+    transform:translateX(-50%) rotate(45deg);
+  }
+  .flow-offline strong{color:var(--y);display:block;margin-bottom:3px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-family:var(--mono)}
+
+  /* features below flow */
+  .flow-callouts{
+    display:grid;grid-template-columns:repeat(3,1fr);
+    gap:16px;max-width:860px;margin:100px auto 0;padding:0 24px;
+  }
+  .callout{
+    background:var(--card);border:1px solid var(--border);
+    border-radius:12px;padding:20px;
+    display:flex;gap:14px;align-items:flex-start;
+  }
+  .callout-icon{
+    width:38px;height:38px;border-radius:9px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .callout-icon svg{width:18px;height:18px}
+  .ci-y{background:rgba(232,255,69,.12);color:var(--y)}
+  .ci-o{background:rgba(255,96,48,.12);color:var(--o)}
+  .ci-g{background:rgba(46,255,160,.12);color:var(--g)}
+  .callout h4{font-size:13px;font-weight:700;margin-bottom:4px}
+  .callout p{font-size:12px;color:var(--muted);line-height:1.55}
+
+  /* ═══════════════════════════════════════════════
+     FEATURES
+  ═══════════════════════════════════════════════ */
+  .features{
+    padding:120px 0;
+    background:var(--bg2);
+    border-top:1px solid var(--border);
+  }
+  .feat-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+  }
+  .feat-card{
+    background:var(--card);border:1px solid var(--border);
+    border-radius:16px;padding:28px;
+    position:relative;overflow:hidden;
+    transition:border-color .3s,transform .3s,box-shadow .3s;
+    cursor:default;
+  }
+  .feat-card::before{
+    content:'';position:absolute;inset:0;border-radius:16px;
+    background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(232,255,69,.04),transparent);
+    opacity:0;transition:opacity .3s;
+  }
+  .feat-card:hover{
+    border-color:rgba(232,255,69,.25);
+    transform:translateY(-4px);
+    box-shadow:0 20px 60px rgba(0,0,0,.4),0 0 40px rgba(232,255,69,.06);
+  }
+  .feat-card:hover::before{opacity:1}
+
+  .feat-card.wide{grid-column:span 2}
+
+  .feat-icon{
+    width:48px;height:48px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:18px;
+  }
+  .feat-icon svg{width:22px;height:22px}
+  .fi-y{background:rgba(232,255,69,.12);color:var(--y)}
+  .fi-o{background:rgba(255,96,48,.12);color:var(--o)}
+  .fi-g{background:rgba(46,255,160,.12);color:var(--g)}
+  .fi-p{background:rgba(168,130,255,.12);color:#A882FF}
+
+  .feat-title{font-size:16px;font-weight:700;margin-bottom:8px}
+  .feat-desc{font-size:13px;color:var(--muted);line-height:1.65}
+
+  /* mini live chart in feat card */
+  .feat-chart{margin-top:20px;height:50px;position:relative}
+  .feat-chart canvas{width:100%!important;height:50px!important}
+
+  /* ═══════════════════════════════════════════════
+     SECURITY SECTION
+  ═══════════════════════════════════════════════ */
+  .security{
+    padding:120px 0;
+    background:var(--bg);
+    border-top:1px solid var(--border);
+  }
+  .security-inner{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:80px;align-items:center;
+  }
+
+  /* animated encryption visual */
+  .enc-visual{
+    position:relative;display:flex;
+    justify-content:center;align-items:center;
+    min-height:360px;
+  }
+  .enc-ring{
+    position:absolute;border-radius:50%;border:1px dashed;
+    animation:spin-cw 20s linear infinite;
+  }
+  .enc-ring:nth-child(1){width:260px;height:260px;border-color:rgba(232,255,69,.15)}
+  .enc-ring:nth-child(2){width:340px;height:340px;border-color:rgba(232,255,69,.08);animation-direction:reverse;animation-duration:28s}
+  .enc-ring:nth-child(3){width:420px;height:420px;border-color:rgba(255,96,48,.06);animation-duration:36s}
+  @keyframes spin-cw{to{transform:rotate(360deg)}}
+
+  .enc-core{
+    width:140px;height:140px;border-radius:50%;
+    background:var(--card2);border:1px solid rgba(232,255,69,.25);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;z-index:1;
+    box-shadow:0 0 60px rgba(232,255,69,.12);
+  }
+  .enc-core svg{width:52px;height:52px;color:var(--y)}
+
+  .enc-badge{
+    position:absolute;
+    background:var(--card2);border:1px solid var(--border2);
+    border-radius:10px;padding:10px 14px;
+    font-family:var(--mono);font-size:11px;
+    display:flex;align-items:center;gap:8px;
+    white-space:nowrap;
+  }
+  .eb-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .eb-y{background:var(--y);box-shadow:0 0 8px var(--y)}
+  .eb-g{background:var(--g);box-shadow:0 0 8px var(--g)}
+  .eb-o{background:var(--o);box-shadow:0 0 8px var(--o)}
+
+  .security-content h2{
+    font-size:clamp(28px,3.5vw,44px);font-weight:900;
+    letter-spacing:-.03em;margin-bottom:18px;line-height:1.15;
+  }
+  .security-content p{color:var(--muted);font-size:16px;margin-bottom:32px;line-height:1.7}
+
+  .sec-list{display:flex;flex-direction:column;gap:14px}
+  .sec-item{
+    display:flex;align-items:flex-start;gap:14px;
+    font-size:14px;color:var(--muted);
+  }
+  .sec-check{
+    width:22px;height:22px;border-radius:6px;flex-shrink:0;
+    background:rgba(232,255,69,.1);
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+  .sec-check svg{width:12px;height:12px;color:var(--y)}
+  .sec-item strong{color:var(--text);font-weight:600}
+
+  /* offline animation */
+  .offline-demo{
+    margin-top:40px;padding:20px;
+    background:var(--card2);border:1px solid var(--border);border-radius:14px;
+  }
+  .od-header{
+    font-family:var(--mono);font-size:11px;color:var(--muted);
+    letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .od-flow{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap}
+  .od-node{
+    background:var(--card);border:1px solid var(--border2);
+    border-radius:7px;padding:7px 12px;font-weight:600;font-size:12px;
+    color:var(--text);white-space:nowrap;
+  }
+  .od-arrow{color:var(--dim);font-size:16px}
+  .od-node.active{border-color:rgba(232,255,69,.4);color:var(--y)}
+  .od-node.buffer{border-color:rgba(255,96,48,.3);color:var(--o)}
+  .od-status{
+    font-size:11px;font-family:var(--mono);margin-top:12px;
+    padding:8px 12px;border-radius:6px;
+  }
+  .od-status.online{background:rgba(46,255,160,.07);color:var(--g)}
+  .od-status.offline{background:rgba(255,96,48,.07);color:var(--o)}
+
+  /* ═══════════════════════════════════════════════
+     SCREENSHOTS / PRODUCT
+  ═══════════════════════════════════════════════ */
+  .product{
+    padding:120px 0;
+    background:var(--bg2);
+    border-top:1px solid var(--border);
+  }
+
+  .prod-tabs{
+    display:flex;gap:8px;flex-wrap:wrap;
+    justify-content:center;margin-bottom:40px;
+  }
+  .prod-tab{
+    padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;
+    cursor:pointer;border:1px solid var(--border2);
+    background:transparent;color:var(--muted);
+    transition:all .2s;font-family:inherit;
+  }
+  .prod-tab.active,.prod-tab:hover{
+    background:var(--y);color:var(--bg);border-color:var(--y);
+  }
+
+  .prod-frame{
+    border-radius:16px;overflow:hidden;
+    border:1px solid var(--border);
+    box-shadow:0 40px 120px rgba(0,0,0,.6),0 0 80px rgba(232,255,69,.06);
+    position:relative;
+  }
+  .prod-frame::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;z-index:2;
+    background:linear-gradient(90deg,var(--y),var(--o));
+  }
+  .prod-screen{display:none;width:100%}
+  .prod-screen.active{display:block}
+  .prod-screen img{width:100%;display:block}
+
+  /* ═══════════════════════════════════════════════
+     BILLING
+  ═══════════════════════════════════════════════ */
+  .billing{
+    padding:120px 0;
+    background:var(--bg);
+    border-top:1px solid var(--border);
+  }
+  .billing-inner{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:80px;align-items:center;
+  }
+  .billing-content h2{
+    font-size:clamp(28px,3.5vw,44px);font-weight:900;
+    letter-spacing:-.03em;margin-bottom:18px;line-height:1.15;
+  }
+  .billing-content p{color:var(--muted);font-size:16px;margin-bottom:32px;line-height:1.7}
+  .billing-types{display:flex;flex-direction:column;gap:12px}
+  .bt{
+    display:flex;align-items:center;gap:14px;
+    background:var(--card);border:1px solid var(--border);
+    border-radius:11px;padding:14px 18px;
+    transition:border-color .2s;
+  }
+  .bt:hover{border-color:rgba(232,255,69,.3)}
+  .bt-emoji{font-size:22px}
+  .bt-body h4{font-size:13px;font-weight:700;margin-bottom:3px}
+  .bt-body p{font-size:12px;color:var(--muted)}
+  .billing-img img{
+    width:100%;border-radius:14px;border:1px solid var(--border);
+    box-shadow:0 32px 80px rgba(0,0,0,.5);
+  }
+
+  /* ═══════════════════════════════════════════════
+     CTA
+  ═══════════════════════════════════════════════ */
+  .cta{
+    padding:140px 24px;
+    background:var(--bg2);
+    border-top:1px solid var(--border);
+    text-align:center;position:relative;overflow:hidden;
+  }
+  .cta::before{
+    content:'';position:absolute;left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    width:600px;height:400px;
+    background:radial-gradient(ellipse,rgba(232,255,69,.07) 0%,transparent 70%);
+    pointer-events:none;
+  }
+  .cta > *{position:relative}
+  .cta h2{
+    font-size:clamp(34px,6vw,64px);font-weight:900;
+    letter-spacing:-.04em;margin-bottom:20px;line-height:1.05;
+  }
+  .cta p{font-size:18px;color:var(--muted);max-width:480px;margin:0 auto 44px}
+  .cta-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+
+  /* ═══════════════════════════════════════════════
+     FOOTER
+  ═══════════════════════════════════════════════ */
+  footer{
+    padding:56px 24px 32px;
+    background:var(--bg);
+    border-top:1px solid var(--border);
+  }
+  .footer-inner{max-width:1160px;margin:0 auto}
+  .footer-top{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    gap:40px;flex-wrap:wrap;margin-bottom:48px;
+  }
+  .footer-brand{max-width:280px}
+  .footer-logo{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .footer-logo .logo-icon{width:30px;height:30px}
+  .footer-logo .logo-text{font-size:14px}
+  .footer-tagline{font-size:13px;color:var(--muted);line-height:1.6}
+
+  .footer-cols{display:flex;gap:48px;flex-wrap:wrap}
+  .footer-col h4{
+    font-size:11px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--dim);
+    font-family:var(--mono);margin-bottom:14px;
+  }
+  .footer-col a{
+    display:block;font-size:13px;color:var(--muted);
+    text-decoration:none;margin-bottom:10px;transition:color .2s;
+  }
+  .footer-col a:hover{color:var(--text)}
+
+  .footer-bottom{
+    border-top:1px solid var(--border);padding-top:24px;
+    display:flex;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;gap:10px;
+  }
+  .footer-copy{font-size:12px;color:var(--muted)}
+  .footer-enc{
+    display:flex;align-items:center;gap:6px;
+    font-family:var(--mono);font-size:10px;color:var(--dim);
+  }
+  .footer-enc span{
+    width:5px;height:5px;border-radius:50%;background:var(--g);
+    animation:blink 2s ease-in-out infinite;
+  }
+
+  /* ═══════════════════════════════════════════════
+     SCROLL ANIMATIONS
+  ═══════════════════════════════════════════════ */
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+  .reveal-d1{transition-delay:.1s}
+  .reveal-d2{transition-delay:.2s}
+  .reveal-d3{transition-delay:.3s}
+  .reveal-d4{transition-delay:.4s}
+
+  /* ═══════════════════════════════════════════════
+     RESPONSIVE
+  ═══════════════════════════════════════════════ */
+  @media(max-width:900px){
+    .nav-links{display:none}
+    .stats-grid{grid-template-columns:repeat(2,1fr)}
+    .stat:nth-child(2){border-right:none}
+    .stat:nth-child(3){border-top:1px solid var(--border)}
+    .security-inner,.billing-inner{grid-template-columns:1fr;gap:48px}
+    .feat-grid{grid-template-columns:1fr 1fr}
+    .feat-card.wide{grid-column:span 2}
+    .flow-callouts{grid-template-columns:1fr}
+    .flow-diagram{justify-content:flex-start}
+    .footer-top{flex-direction:column}
+  }
+  @media(max-width:600px){
+    .feat-grid,.feat-card.wide{grid-column:1;grid-template-columns:1fr}
+    .feat-card.wide{grid-column:auto}
+    .feat-grid{grid-template-columns:1fr}
+    .stats-grid{grid-template-columns:1fr 1fr}
+    .stat{border-right:none;border-bottom:1px solid var(--border)}
+    .stat:last-child{border-bottom:none}
+  }
+  </style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="noise"></div>
+
+<!-- ═══ NAV ═══════════════════════════════════════════════════════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </div>
+      <span class="logo-text">Enerji<span>İzleme</span></span>
+    </a>
+
+    <div class="nav-links">
+      <a href="#nasil-calisir">Nasıl Çalışır</a>
+      <a href="#ozellikler">Özellikler</a>
+      <a href="#guvenlik">Güvenlik</a>
+      <a href="#fatura">Fatura</a>
+    </div>
+
+    <a href="https://app.enerji-izleme.com/login" class="btn-login">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/>
+        <line x1="15" y1="12" x2="3" y2="12"/>
+      </svg>
+      Giriş Yap
+    </a>
+  </div>
+</nav>
+
+
+<!-- ═══ HERO ═══════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="hero-inner">
+    <div class="hero-eyebrow">
+      <div class="hero-dot"></div>
+      Gerçek Zamanlı · Güvenli · Kesintisiz
+    </div>
+
+    <h1>
+      <span class="word-1">Her Watt,</span>
+      <span class="word-2">Her Saniye</span>
+      <span class="word-3">Kontrol Altında.</span>
+    </h1>
+
+    <p class="hero-desc">
+      Endüstriyel tesislerinizin tüm enerji tüketimini uçtan uca şifreli iletişimle gerçek zamanlı izleyin.
+      İnternet kesintisinde bile veri kaybolmaz — bağlantı sağlandığında otomatik senkronize edilir.
+    </p>
+
+    <div class="hero-actions">
+      <a href="https://app.enerji-izleme.com/login" class="btn-hero">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+          <polyline points="10 17 15 12 10 7"/>
+          <line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Sisteme Giriş Yap
+      </a>
+      <a href="#nasil-calisir" class="btn-outline">
+        Nasıl Çalışır? ↓
+      </a>
+    </div>
+
+    <div class="ticker-wrap">
+      <div class="ticker-live">Canlı</div>
+      <div class="ticker-scroll">
+        <div class="ticker-items" id="tickerItems">
+          <!-- JS ile doldurulacak -->
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ STATS ════════════════════════════════════════════════════ -->
+<div class="stats">
+  <div class="stats-grid">
+    <div class="stat reveal">
+      <div class="stat-num" data-target="99" data-suffix=".9%">0</div>
+      <div class="stat-label">Uptime Garantisi</div>
+    </div>
+    <div class="stat reveal reveal-d1">
+      <div class="stat-num" data-target="100" data-suffix="%">0</div>
+      <div class="stat-label">Şifreli Veri İletimi</div>
+    </div>
+    <div class="stat reveal reveal-d2">
+      <div class="stat-num" data-target="5" data-prefix="&lt;" data-suffix=" dk">0</div>
+      <div class="stat-label">Cihaz Entegrasyon Süresi</div>
+    </div>
+    <div class="stat reveal reveal-d3">
+      <div class="stat-num" data-target="30" data-suffix="% Tasarruf">0</div>
+      <div class="stat-label">Ortalama Enerji Kazanımı</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ FLOW — Uçtan Uca Veri Akışı ════════════════════════════ -->
+<section class="flow" id="nasil-calisir">
+  <div class="container">
+    <div class="reveal" style="text-align:center;margin-bottom:60px">
+      <div class="section-tag" style="margin-bottom:16px">Nasıl Çalışır</div>
+      <h2 class="section-title">Uçtan Uca Veri Akışı</h2>
+      <p class="section-sub" style="margin:0 auto 0">
+        Sahadan yönetim paneline — kesintisiz, şifreli ve ölçeklenebilir veri pipeline'ı.
+      </p>
+    </div>
+  </div>
+
+  <div class="flow-diagram reveal reveal-d1">
+
+    <!-- Node 1: Saha Cihazları -->
+    <div class="flow-node">
+      <div class="fn-icon">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="14" width="36" height="22" rx="3"/>
+          <path d="M14 22h4M14 28h4M26 22h8M26 28h8"/>
+          <circle cx="20" cy="25" r="2" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="fn-title">Saha Cihazları</div>
+      <div class="fn-desc">Sayaç · PLC · Sensör<br/>Enerji Analizörü</div>
+    </div>
+
+    <!-- Connector 1 -->
+    <div class="flow-conn">
+      <div class="conn-line"></div>
+      <div class="conn-label">Endüstriyel<br/>Haberleşme</div>
+    </div>
+
+    <!-- Node 2: Veri Toplayıcı -->
+    <div class="flow-node" style="position:relative">
+      <div class="fn-badge orange">Donanım</div>
+      <div class="fn-icon" style="border-color:rgba(255,96,48,.3)">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="8" y="8" width="32" height="32" rx="4"/>
+          <path d="M16 20l4 4-4 4M28 28h6"/>
+          <path d="M28 16h-4a2 2 0 0 0-2 2v1"/>
+        </svg>
+      </div>
+      <div class="fn-title">Veri Toplayıcı</div>
+      <div class="fn-desc">Saha istemcisi<br/>+ Yerel buffer</div>
+      <!-- offline bubble -->
+      <div class="flow-offline">
+        <strong>⚡ İnternet Kesintisi Koruması</strong>
+        Bağlantı kesilirse veriler cihazda güvenle saklanır. Bağlantı sağlandığında sıra bozulmadan otomatik gönderilir.
+      </div>
+    </div>
+
+    <!-- Connector 2 -->
+    <div class="flow-conn">
+      <div class="conn-line" style="background:linear-gradient(90deg,rgba(255,96,48,.3),rgba(232,255,69,.3))"></div>
+      <div class="conn-label" style="color:var(--y)">MQTT<br/>+ SSL/TLS</div>
+    </div>
+
+    <!-- Node 3: Mesajlaşma -->
+    <div class="flow-node">
+      <div class="fn-badge green">SSL/TLS</div>
+      <div class="fn-icon" style="border-color:rgba(46,255,160,.2)">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M24 6l14 5v10c0 9-6 17-14 21C16 38 10 30 10 21V11z"/>
+          <path d="M18 24l4 4 8-8"/>
+        </svg>
+      </div>
+      <div class="fn-title">Şifreli İletim</div>
+      <div class="fn-desc">Mesajlaşma Katmanı<br/>Uçtan uca şifreleme</div>
+    </div>
+
+    <!-- Connector 3 -->
+    <div class="flow-conn">
+      <div class="conn-line"></div>
+      <div class="conn-label">Gerçek<br/>zamanlı</div>
+    </div>
+
+    <!-- Node 4: Sunucu -->
+    <div class="flow-node">
+      <div class="fn-icon">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="8" width="36" height="12" rx="2"/>
+          <rect x="6" y="24" width="36" height="12" rx="2"/>
+          <circle cx="14" cy="14" r="2" fill="currentColor"/>
+          <circle cx="14" cy="30" r="2" fill="currentColor"/>
+          <path d="M20 14h14M20 30h14"/>
+        </svg>
+      </div>
+      <div class="fn-title">Bulut Sunucu</div>
+      <div class="fn-desc">API · PostgreSQL<br/>Alarm motoru</div>
+    </div>
+
+    <!-- Connector 4 -->
+    <div class="flow-conn">
+      <div class="conn-line"></div>
+      <div class="conn-label">HTTPS<br/>Tarayıcı</div>
+    </div>
+
+    <!-- Node 5: Panel -->
+    <div class="flow-node">
+      <div class="fn-badge" style="background:var(--y)">Panel</div>
+      <div class="fn-icon" style="border-color:rgba(232,255,69,.3)">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="8" width="36" height="26" rx="3"/>
+          <path d="M6 34h36M18 42h12"/>
+          <path d="M14 24l6-6 6 6 6-8"/>
+        </svg>
+      </div>
+      <div class="fn-title">Yönetim Paneli</div>
+      <div class="fn-desc">Tarayıcı tabanlı<br/>Tüm cihazlar</div>
+    </div>
+
+  </div><!-- /flow-diagram -->
+
+  <!-- Callouts -->
+  <div class="flow-callouts">
+    <div class="callout reveal">
+      <div class="callout-icon ci-o">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+        </svg>
+      </div>
+      <div>
+        <h4>Yerel Buffer</h4>
+        <p>İnternet kesilse de saha cihazında SQLite veritabanına yazılır. Bağlantı sağlanınca sıralı aktarım gerçekleşir.</p>
+      </div>
+    </div>
+    <div class="callout reveal reveal-d1">
+      <div class="callout-icon ci-g">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <h4>SSL/TLS Şifreleme</h4>
+        <p>Tüm veri iletimi uçtan uca şifreli. Saha cihazından buluta kadar hiçbir veri açık iletilemez.</p>
+      </div>
+    </div>
+    <div class="callout reveal reveal-d2">
+      <div class="callout-icon ci-y">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div>
+        <h4>Anlık Alarm Motoru</h4>
+        <p>Sunucuya ulaşan her veri paketinde PostgreSQL NOTIFY ile alarm kuralları gerçek zamanlı tetiklenir.</p>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ═══ FEATURES ════════════════════════════════════════════════ -->
+<section class="features" id="ozellikler">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-tag">Özellikler</div>
+      <h2 class="section-title">Platformun Güçlü Yönleri</h2>
+      <p class="section-sub" style="margin-left:auto;margin-right:auto">
+        Enerji yönetiminin her boyutu — tek çatı altında.
+      </p>
+    </div>
+
+    <div class="feat-grid">
+
+      <div class="feat-card wide reveal">
+        <div class="feat-icon fi-y">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="feat-title">Anlık Cihaz Durumu</div>
+        <p class="feat-desc">Voltaj, akım, aktif/reaktif güç ve güç faktörü değerleri milisaniye gecikmesiyle ekrana yansır. Tüm şubelerinizi tek panelden görün.</p>
+        <div class="feat-chart">
+          <canvas id="liveChart"></canvas>
+        </div>
+      </div>
+
+      <div class="feat-card reveal reveal-d1">
+        <div class="feat-icon fi-o">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </div>
+        <div class="feat-title">Otomatik Alarm Sistemi</div>
+        <p class="feat-desc">Her parametre için eşik değerleri belirleyin. Aşım anında bildirim alın. Alarm geçmişi kayıt altında.</p>
+      </div>
+
+      <div class="feat-card reveal reveal-d2">
+        <div class="feat-icon fi-g">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <polyline points="8 21 12 17 16 21"/>
+          </svg>
+        </div>
+        <div class="feat-title">Tüketim İzleme Ekranı</div>
+        <p class="feat-desc">Saatlik, günlük, aylık tüketim grafikleri. Şube bazında karşılaştırma ve anormal kullanım tespiti.</p>
+      </div>
+
+      <div class="feat-card reveal">
+        <div class="feat-icon fi-y">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+        </div>
+        <div class="feat-title">Akıllı Fatura Hesaplama</div>
+        <p class="feat-desc">T1/T2/T3 tarifeli elektrik, su ve doğalgaz fatura tahmini. Fatura gelmeden önce ne ödeyeceğinizi bilin.</p>
+      </div>
+
+      <div class="feat-card reveal reveal-d1">
+        <div class="feat-icon fi-o">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="18" r="3"/>
+            <circle cx="6" cy="6" r="3"/>
+            <path d="M13 6h3a2 2 0 0 1 2 2v7"/>
+            <line x1="6" y1="9" x2="6" y2="21"/>
+          </svg>
+        </div>
+        <div class="feat-title">Hızlı Cihaz Entegrasyonu</div>
+        <p class="feat-desc">Endüstriyel haberleşme protokolü destekleyen her cihaz 5 dakikada sisteme bağlanır. Özel donanım gerekmez.</p>
+      </div>
+
+      <div class="feat-card reveal reveal-d2">
+        <div class="feat-icon fi-g">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="feat-title">Rol Tabanlı Erişim</div>
+        <p class="feat-desc">Şirket → Bölge → Şube hiyerarşisi. Her kullanıcı sadece yetkili olduğu verileri görür.</p>
+      </div>
+
+      <div class="feat-card reveal">
+        <div class="feat-icon fi-p">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="feat-title">Jeneratör & Kesinti Takibi</div>
+        <p class="feat-desc">Elektrik kesintilerini, jeneratörün devreye girip çıkma zamanlarını otomatik kayıt altına alın.</p>
+      </div>
+
+      <div class="feat-card reveal reveal-d1">
+        <div class="feat-icon fi-y">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="12" x2="2" y2="12"/>
+            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+            <line x1="6" y1="16" x2="6.01" y2="16"/>
+            <line x1="10" y1="16" x2="10.01" y2="16"/>
+          </svg>
+        </div>
+        <div class="feat-title">Uzaktan Komut Gönderme</div>
+        <p class="feat-desc">Yetkili kullanıcılar saha cihazlarına güç kesme, yeniden başlatma gibi komutları uzaktan güvenle gönderebilir.</p>
+      </div>
+
+      <div class="feat-card reveal reveal-d2">
+        <div class="feat-icon fi-o">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div class="feat-title">Çoklu Tesis Yönetimi</div>
+        <p class="feat-desc">Türkiye genelindeki tüm tesislerinizi harita üzerinde görün. Merkezi yönetim, lokasyon bazlı raporlama.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ SECURITY ═══════════════════════════════════════════════ -->
+<section class="security" id="guvenlik">
+  <div class="container">
+    <div class="security-inner">
+
+      <div class="enc-visual reveal">
+        <div class="enc-ring"></div>
+        <div class="enc-ring"></div>
+        <div class="enc-ring"></div>
+
+        <div class="enc-core">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
+
+        <div class="enc-badge" style="top:14%;right:8%">
+          <div class="eb-dot eb-g"></div>
+          <span class="mono" style="font-size:10px">SSL/TLS AKTİF</span>
+        </div>
+        <div class="enc-badge" style="bottom:18%;left:4%">
+          <div class="eb-dot eb-y"></div>
+          <span class="mono" style="font-size:10px">Buffer: 0 kayıt</span>
+        </div>
+        <div class="enc-badge" style="bottom:10%;right:10%">
+          <div class="eb-dot eb-o"></div>
+          <span class="mono" style="font-size:10px">QoS Seviye 1</span>
+        </div>
+      </div>
+
+      <div class="security-content reveal reveal-d1">
+        <div class="section-tag">Güvenlik & Güvenilirlik</div>
+        <h2>
+          Veriniz Hiçbir Zaman<br/>
+          <em>Kaybolmaz</em>
+        </h2>
+        <p>
+          İnternet bağlantısı kesilse bile saha donanımındaki yerel bellek devreye girer.
+          Tüm veri iletimi SSL/TLS ile şifrelenir; kimse dinleyemez, değiştiremez.
+        </p>
+
+        <ul class="sec-list">
+          <li class="sec-item">
+            <div class="sec-check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span><strong>Uçtan uca şifreleme:</strong> MQTT üzerinden tüm veri SSL/TLS protokolüyle iletilir.</span>
+          </li>
+          <li class="sec-item">
+            <div class="sec-check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span><strong>Yerel SQLite buffer:</strong> Ağ kesildiğinde ölçümler saha donanımında saklanır, bağlantı gelince sıralı aktarım yapılır.</span>
+          </li>
+          <li class="sec-item">
+            <div class="sec-check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span><strong>API Key kimlik doğrulama:</strong> Her saha istemcisi benzersiz anahtarıyla doğrulanır; yetkisiz erişim mümkün değildir.</span>
+          </li>
+          <li class="sec-item">
+            <div class="sec-check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span><strong>Watchdog & Health Monitor:</strong> Saha yazılımı kendini izler; süreç durursa otomatik yeniden başlar.</span>
+          </li>
+          <li class="sec-item">
+            <div class="sec-check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span><strong>Güvenli mesajlaşma (QoS 1):</strong> "En az bir kez iletim" garantisiyle hiçbir ölçüm düşmez.</span>
+          </li>
+        </ul>
+
+        <!-- Offline demo -->
+        <div class="offline-demo">
+          <div class="od-header">
+            <span class="mono" style="font-size:10px;color:var(--y);letter-spacing:.1em">SİMÜLASYON</span>
+            Offline Buffer Akışı
+          </div>
+          <div class="od-flow">
+            <div class="od-node active">Saha Cihazı</div>
+            <div class="od-arrow">→</div>
+            <div class="od-node active">Veri Toplayıcı</div>
+            <div class="od-arrow" id="connArrow" style="color:var(--o)">⚡</div>
+            <div class="od-node buffer" id="bufferNode">SQLite Buffer</div>
+            <div class="od-arrow" id="netArrow">→</div>
+            <div class="od-node" id="serverNode">Sunucu</div>
+          </div>
+          <div class="od-status offline" id="connStatus">
+            İnternet kesintisi algılandı — veriler güvenle buffer'a yazılıyor...
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ PRODUCT SCREENSHOTS ════════════════════════════════════ -->
+<section class="product" id="ekranlar">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-tag">Ürün Ekranları</div>
+      <h2 class="section-title">Güçlü Arayüz, <em>Sade Kullanım</em></h2>
+      <p class="section-sub" style="margin-left:auto;margin-right:auto">
+        Karmaşık veriler, sade grafiklerle. Operatörleriniz tek bakışta her şeyi görür.
+      </p>
+    </div>
+
+    <div class="prod-tabs reveal reveal-d1">
+      <button class="prod-tab active" onclick="switchTab('dash',this)">Dashboard</button>
+      <button class="prod-tab" onclick="switchTab('monitor',this)">Enerji İzleme</button>
+      <button class="prod-tab" onclick="switchTab('consume',this)">Tüketim Ekranı</button>
+      <button class="prod-tab" onclick="switchTab('invoice',this)">Fatura Modülü</button>
+      <button class="prod-tab" onclick="switchTab('alarm',this)">Alarmlar</button>
+    </div>
+
+    <div class="prod-frame reveal reveal-d2">
+      <div class="prod-screen active" id="screen-dash">
+        <img src="images/dashboard.png" alt="Dashboard" />
+      </div>
+      <div class="prod-screen" id="screen-monitor">
+        <img src="images/energy-monitoring.png" alt="Enerji İzleme" />
+      </div>
+      <div class="prod-screen" id="screen-consume">
+        <img src="images/consumptions.png" alt="Tüketim Ekranı" />
+      </div>
+      <div class="prod-screen" id="screen-invoice">
+        <img src="images/invoices.png" alt="Fatura Modülü" />
+      </div>
+      <div class="prod-screen" id="screen-alarm">
+        <img src="images/alarms.png" alt="Alarmlar" />
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ BILLING ════════════════════════════════════════════════ -->
+<section class="billing" id="fatura">
+  <div class="container">
+    <div class="billing-inner">
+
+      <div class="billing-content reveal">
+        <div class="section-tag">Fatura Modülü</div>
+        <h2 class="section-title">
+          Sayaç Verisi → <em>Gerçek Fatura</em>
+        </h2>
+        <p>
+          Türkiye elektrik tarifelerine tam uyumlu hesaplama motoru.
+          Fatura gelmeden önce ne ödeyeceğinizi bilin.
+          T1/T2/T3, kademeli tarife, kayıp-kaçak ve tüm yasal vergiler dahil.
+        </p>
+        <div class="billing-types">
+          <div class="bt">
+            <div class="bt-emoji">⚡</div>
+            <div class="bt-body">
+              <h4>Elektrik Sayacı</h4>
+              <p>T1 Puant · T2 Gündüz · T3 Gece · Kademeli tarife · KDV + TRT + Enerji Fonu</p>
+            </div>
+          </div>
+          <div class="bt">
+            <div class="bt-emoji">💧</div>
+            <div class="bt-body">
+              <h4>Su Sayacı</h4>
+              <p>m³ bazlı hesaplama · Arıtma & dağıtım bedeli · Çevresel katkı payı</p>
+            </div>
+          </div>
+          <div class="bt">
+            <div class="bt-emoji">🔥</div>
+            <div class="bt-body">
+              <h4>Doğalgaz Sayacı</h4>
+              <p>Tarife dönemleri · İletim & dağıtım giderleri · İthalatçı bedeli</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="billing-img reveal reveal-d1">
+        <img src="images/invoices.png" alt="Fatura Modülü" />
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ CTA ════════════════════════════════════════════════════ -->
+<section class="cta">
+  <div class="section-tag reveal">Platform</div>
+  <h2 class="reveal reveal-d1">
+    Enerjinizi<br/>
+    <span style="background:linear-gradient(125deg,var(--y),var(--o));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Kontrol Edin</span>
+  </h2>
+  <p class="reveal reveal-d2">
+    Sisteme giriş yapın ve tesislerinizi izlemeye hemen başlayın.
+  </p>
+  <div class="cta-btns reveal reveal-d3">
+    <a href="https://app.enerji-izleme.com/login" class="btn-hero">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/>
+        <line x1="15" y1="12" x2="3" y2="12"/>
+      </svg>
+      Sisteme Giriş Yap
+    </a>
+    <a href="#ozellikler" class="btn-outline">Özelliklere Bak</a>
+  </div>
+</section>
+
+
+<!-- ═══ FOOTER ══════════════════════════════════════════════════ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <span class="logo-text">Enerji<span>İzleme</span></span>
+        </div>
+        <p class="footer-tagline">
+          Endüstriyel tesisler için gerçek zamanlı,<br/>
+          güvenli ve kesintisiz enerji yönetim platformu.
+        </p>
+      </div>
+
+      <div class="footer-cols">
+        <div class="footer-col">
+          <h4>Platform</h4>
+          <a href="#nasil-calisir">Nasıl Çalışır</a>
+          <a href="#ozellikler">Özellikler</a>
+          <a href="#guvenlik">Güvenlik</a>
+          <a href="#ekranlar">Ekranlar</a>
+        </div>
+        <div class="footer-col">
+          <h4>Modüller</h4>
+          <a href="#">Enerji İzleme</a>
+          <a href="#">Fatura Modülü</a>
+          <a href="#">Alarm Sistemi</a>
+          <a href="#">Cihaz Yönetimi</a>
+        </div>
+        <div class="footer-col">
+          <h4>Şirket</h4>
+          <a href="#">Hakkımızda</a>
+          <a href="#">İletişim</a>
+          <a href="#">Destek</a>
+          <a href="https://app.enerji-izleme.com/login">Giriş Yap</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2026 enerji-izleme.com — Tüm hakları saklıdır.</div>
+      <div class="footer-enc">
+        <span></span>
+        SSL/TLS ile şifreli · MQTT · PostgreSQL
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<script>
+/* ═══ CANVAS — circuit nodes ════════════════════════════════ */
+(function(){
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W,H,nodes;
+  const Y = '#E8FF45', O = '#FF6030';
+
+  function resize(){
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    init();
+  }
+  function init(){
+    const count = Math.floor((W*H)/18000);
+    nodes = Array.from({length:count},()=>({
+      x:Math.random()*W, y:Math.random()*H,
+      vx:(Math.random()-.5)*.25, vy:(Math.random()-.5)*.25,
+      r:Math.random()*1.2+.4,
+    }));
+  }
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    nodes.forEach(n=>{
+      n.x+=n.vx; n.y+=n.vy;
+      if(n.x<0||n.x>W) n.vx*=-1;
+      if(n.y<0||n.y>H) n.vy*=-1;
+    });
+    const DIST=120;
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<DIST){
+          const alpha=(1-d/DIST)*.4;
+          ctx.beginPath();
+          ctx.strokeStyle=`rgba(232,255,69,${alpha*.6})`;
+          ctx.lineWidth=.5;
+          ctx.moveTo(nodes[i].x,nodes[i].y);
+          ctx.lineTo(nodes[j].x,nodes[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    nodes.forEach(n=>{
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(232,255,69,.5)';
+      ctx.fill();
+    });
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener('resize',resize);
+  resize();
+  frame();
+})();
+
+
+/* ═══ TICKER ════════════════════════════════════════════════ */
+(function(){
+  const data = [
+    {name:'Cihaz-1 Güç',val:'18.4',unit:'kW'},
+    {name:'Cihaz-2 Gerilim',val:'380.1',unit:'V'},
+    {name:'Cihaz-3 Akım',val:'42.1',unit:'A'},
+    {name:'Cihaz-4 Tüketim',val:'1449',unit:'kWh'},
+    {name:'Cihaz-5 GF',val:'0.96',unit:'PF'},
+    {name:'Cihaz-6 Güç',val:'22.7',unit:'kW'},
+    {name:'Cihaz-1 Gerilim',val:'379.8',unit:'V'},
+    {name:'Cihaz-7 Akım',val:'58.3',unit:'A'},
+  ];
+  const el = document.getElementById('tickerItems');
+  // double for seamless loop
+  [...data,...data].forEach(d=>{
+    const span = document.createElement('span');
+    span.className = 'ticker-item';
+    span.innerHTML = `${d.name} <span class="ticker-val">${d.val}</span><span class="ticker-unit">${d.unit}</span>`;
+    el.appendChild(span);
+  });
+})();
+
+
+/* ═══ SCROLL REVEAL ═════════════════════════════════════════ */
+const revealObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); });
+},{threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
+
+
+/* ═══ COUNTER ANIMATION ═════════════════════════════════════ */
+const counterObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(!e.isIntersecting) return;
+    const el = e.target;
+    const target = parseFloat(el.dataset.target)||0;
+    const suffix = el.dataset.suffix||'';
+    const prefix = el.dataset.prefix||'';
+    let start=null;
+    const dur=1800;
+    function step(ts){
+      if(!start) start=ts;
+      const prog=Math.min((ts-start)/dur,1);
+      const ease=1-Math.pow(1-prog,3);
+      const cur=Math.floor(ease*target);
+      el.innerHTML = prefix + cur + suffix;
+      if(prog<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+    counterObs.unobserve(el);
+  });
+},{threshold:0.5});
+document.querySelectorAll('.stat-num').forEach(el=>counterObs.observe(el));
+
+
+/* ═══ LIVE CHART (feat card) ════════════════════════════════ */
+(function(){
+  const canvas = document.getElementById('liveChart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.offsetWidth;
+  canvas.width = W; canvas.height = 50;
+
+  let pts = Array.from({length:40},(_,i)=>({
+    x:i*(W/39), y:25+Math.sin(i*.4)*14+(Math.random()-0.5)*8
+  }));
+
+  function drawChart(){
+    ctx.clearRect(0,0,W,50);
+    // gradient fill
+    const grad = ctx.createLinearGradient(0,0,0,50);
+    grad.addColorStop(0,'rgba(232,255,69,.25)');
+    grad.addColorStop(1,'rgba(232,255,69,0)');
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){
+      const prev=pts[i-1], cur=pts[i];
+      const cpx=(prev.x+cur.x)/2;
+      ctx.bezierCurveTo(cpx,prev.y,cpx,cur.y,cur.x,cur.y);
+    }
+    ctx.lineTo(W,50); ctx.lineTo(0,50); ctx.closePath();
+    ctx.fillStyle=grad; ctx.fill();
+    // line
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++){
+      const prev=pts[i-1], cur=pts[i];
+      const cpx=(prev.x+cur.x)/2;
+      ctx.bezierCurveTo(cpx,prev.y,cpx,cur.y,cur.x,cur.y);
+    }
+    ctx.strokeStyle='#E8FF45'; ctx.lineWidth=1.8; ctx.stroke();
+    // live dot
+    const last=pts[pts.length-1];
+    ctx.beginPath();
+    ctx.arc(last.x,last.y,4,0,Math.PI*2);
+    ctx.fillStyle='#E8FF45';
+    ctx.shadowColor='#E8FF45'; ctx.shadowBlur=10;
+    ctx.fill();
+    ctx.shadowBlur=0;
+  }
+
+  function updateChart(){
+    pts.shift();
+    const last=pts[pts.length-1];
+    const newY = Math.max(6,Math.min(44, last.y + (Math.random()-0.48)*6));
+    pts.push({x:W, y:newY});
+    pts.forEach((p,i)=>{ p.x = i*(W/39); });
+    drawChart();
+    setTimeout(updateChart, 600+Math.random()*400);
+  }
+  drawChart();
+  setTimeout(updateChart, 1000);
+})();
+
+
+/* ═══ TAB SWITCHER ══════════════════════════════════════════ */
+function switchTab(name, btn){
+  document.querySelectorAll('.prod-screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.prod-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+
+/* ═══ OFFLINE DEMO ANIMATION ════════════════════════════════ */
+(function(){
+  const connArrow = document.getElementById('connArrow');
+  const bufferNode = document.getElementById('bufferNode');
+  const serverNode = document.getElementById('serverNode');
+  const netArrow   = document.getElementById('netArrow');
+  const status     = document.getElementById('connStatus');
+  if(!connArrow) return;
+
+  let online = false;
+  function toggle(){
+    online = !online;
+    if(!online){
+      // offline
+      connArrow.textContent='✕';
+      connArrow.style.color='var(--o)';
+      bufferNode.className='od-node buffer';
+      netArrow.style.color='var(--dim)';
+      serverNode.className='od-node';
+      status.className='od-status offline';
+      status.textContent='İnternet kesintisi algılandı — veriler güvenle buffer\'a yazılıyor...';
+    } else {
+      // online
+      connArrow.textContent='→';
+      connArrow.style.color='var(--g)';
+      bufferNode.className='od-node active';
+      netArrow.style.color='var(--g)';
+      serverNode.className='od-node active';
+      status.className='od-status online';
+      status.textContent='Bağlantı yeniden kuruldu — buffer\'daki veriler sunucuya aktarılıyor ✓';
+    }
+    setTimeout(toggle, online?3500:4000);
+  }
+  setTimeout(toggle, 2000);
+})();
+
+
+/* ═══ SMOOTH SCROLL ═════════════════════════════════════════ */
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    const t=document.querySelector(a.getAttribute('href'));
+    if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth',block:'start'})}
+  });
+});
+</script>
+</body>
+</html>
